@@ -40,4 +40,40 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+    Not(in=instruction[15], out=isA);
+    Mux16(a=aluOut, b=instruction, sel=isA, out=muxOut1);
+
+    // Get control bit for registerA
+    Or(a=isA, b=instruction[5], out=loadRegisterA);
+    ARegister(in=muxOut1, load=loadRegisterA, out=registerA, out[0..14]=addressM);
+
+    // Get control bit for registerD
+    And(a=instruction[15], b=instruction[4], out=loadRegisterD);
+    DRegister(in=aluOut, load=loadRegisterD, out=registerD);
+
+    // Get control bit for M
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // Determine the second input of the ALU
+    Mux16(a=registerA, b=inM, sel=instruction[12], out=muxOut2);
+
+    ALU(x=registerD, y=muxOut2, zx=instruction[11], nx=instruction[10], zy=instruction[9], ny=instruction[8], f=instruction[7], no=instruction[6],
+    out=outM, out=aluOut, zr=zr, ng=ng);
+
+    // Calculate when to load new address, i.e. do jump
+    And(a=ng, b=instruction[2], out=condition1);
+    And(a=zr, b=instruction[1], out=condition2);
+    Or(a=zr, b=ng, out=lessThanEqualToZero);
+    Not(in=lessThanEqualToZero, out=greaterThanZero);
+    And(a=greaterThanZero, b=instruction[0], out=condition3);
+    Or(a=condition1, b=condition2, out=temp);
+    Or(a=temp, b=condition3, out=loadFlagWhenC);
+
+    // If it's A command, never jump
+    And(a=instruction[15], b=loadFlagWhenC, out=loadFlag);
+
+    // Calculate when to inc
+    Not(in=loadFlag, out=incFlag);
+
+    PC(in=registerA, load=loadFlag, inc=incFlag, reset=reset, out[0..14]=pc);
 }
